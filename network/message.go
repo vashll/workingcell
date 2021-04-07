@@ -1,8 +1,6 @@
 package net
 
-import (
-	"github.com/golang/protobuf/proto"
-)
+import "github.com/golang/protobuf/proto"
 
 type Message struct {
 	Cmd uint32
@@ -15,6 +13,6 @@ func NewDataMsg(data []byte) *Message {
 	}
 }
 
-func ParseProroMsgData(data []byte) {
-
+func ParseProtoMsgData(data []byte) {
+	proto.Unmarshal(data, nil)
 }
