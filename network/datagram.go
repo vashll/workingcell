@@ -1,7 +1,6 @@
-package net
+package network
 
 import (
-	"errors"
 	"io"
 	"net"
 	"unsafe"
@@ -12,15 +11,14 @@ const (
 	DataHeadSize = 8
 )
 
-type IDataHandler interface {
-	ReadData(conn net.Conn) (error, []byte)
-	SendData(conn net.Conn, data []byte) error
-
+type IDataReader interface {
+	ReadData(conn net.Conn) (error, *Message)
+	MsgToData(msg *Message) []byte
 }
 
 type DataHead struct {
-	Len   uint32
-	Cmd   uint32
+	Len uint32
+	Cmd uint32
 }
 
 func (r *DataHead) Marshal() []byte {
@@ -38,10 +36,10 @@ func (r *DataHead) Unmarshal(data []byte) {
 }
 
 //默认数据处理程序
-type DefaultDataHandler struct {
+type DefaultDataReader struct {
 }
 
-func (r *DefaultDataHandler) ReadData(conn net.Conn) (err error, dataBuf []byte) {
+func (r *DefaultDataReader) ReadData(conn net.Conn) (err error, msg *Message) {
 	headBuf := make([]byte, DataHeadSize)
 	var head *DataHead
 	size, err := io.ReadFull(conn, headBuf)
@@ -56,27 +54,32 @@ func (r *DefaultDataHandler) ReadData(conn net.Conn) (err error, dataBuf []byte)
 		return
 	}
 	head = (*DataHead)(unsafe.Pointer(&headBuf[0]))
-	dataBuf = make([]byte, head.Len + DataHeadSize)
-	copy(dataBuf[:DataHeadSize], headBuf)
+	msg = &Message{
+		Cmd: head.Cmd,
+	}
 	if head.Len > 0 {
+		dataBuf := make([]byte, head.Len)
 		_, err = io.ReadFull(conn, dataBuf[DataHeadSize:])
 		if err != nil {
 			LogInfo("data handler read data error:%s", err)
 			return
 		}
+		msg.Data = dataBuf
 	}
 	return
 }
 
-func (r *DefaultDataHandler) SendData(conn net.Conn, data []byte) error {
-	n, err := conn.Write(data)
-	if err != nil {
-		return err
+func (r *DefaultDataReader) MsgToData(msg *Message) []byte {
+	size := len(msg.Data) + DataHeadSize
+	buf := make([]byte, size)
+	headBuf := buf[:DataHeadSize]
+	header := (*DataHead)(unsafe.Pointer(&headBuf[0]))
+	header.Cmd = msg.Cmd
+	header.Len = uint32(size)
+	if msg.Data != nil {
+		copy(buf[:DataHeadSize], msg.Data)
 	}
-	if n < len(data) {
-		return errors.New("size of write data is less than all")
-	}
-	return nil
+	return buf
 }
 
 func DefaultDataToMsg(data []byte) *Message {

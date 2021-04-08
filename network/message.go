@@ -1,9 +1,11 @@
-package net
+package network
 
-import "github.com/golang/protobuf/proto"
+import (
+	"github.com/golang/protobuf/proto"
+)
 
 type Message struct {
-	Cmd uint32
+	Cmd  uint32
 	Data []byte
 }
 
