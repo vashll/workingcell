@@ -17,6 +17,10 @@ func (r *tcpNetCell) SetDataReader(reader IDataReader) {
 	r.dataReader = reader
 }
 
+func (r *tcpNetCell) IsStop() bool {
+	return r.stop
+}
+
 func (r *tcpNetCell) StartServe(addr string) {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -25,8 +29,18 @@ func (r *tcpNetCell) StartServe(addr string) {
 		return
 	}
 	r.listener = listener
+	r.stop = false
 	common.Go(func() {
-		for !r.stop {
+		select {
+		case <-common.StopChan:
+			if r.listener != nil {
+				r.stop = true
+				r.listener.Close()
+			}
+		}
+	})
+	common.Go(func() {
+		for !r.IsStop() {
 			conn, err := listener.Accept()
 			if err != nil {
 				LogError("tcp cell accept fail :%s", err)

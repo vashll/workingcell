@@ -2,6 +2,7 @@ package network
 
 import (
 	"net"
+	"sync/atomic"
 	"workincell/common"
 	"workincell/log"
 )
@@ -10,7 +11,7 @@ type tcpMsgCell struct {
 	conn       net.Conn
 	writeCh    chan *Message
 	dataReader IDataReader
-	stop       bool
+	stop       int32
 }
 
 func newTcpMsgCell(conn net.Conn, reader IDataReader) *tcpMsgCell {
@@ -21,11 +22,20 @@ func newTcpMsgCell(conn net.Conn, reader IDataReader) *tcpMsgCell {
 	return msgCell
 }
 
+func (r *tcpMsgCell) IsStop() bool {
+	return r.stop == 1
+}
+
+func (r *tcpMsgCell) Start() {
+	r.stop = 1
+}
+
 func (r *tcpMsgCell) Run() {
 	if r.dataReader == nil {
 		log.LogError("tcp msg cell run fail, data handler is nil")
 		return
 	}
+	r.Start()
 	common.Go(func() {
 		r.read()
 	})
@@ -35,11 +45,14 @@ func (r *tcpMsgCell) Run() {
 }
 
 func (r *tcpMsgCell) Stop() {
-
+	atomic.CompareAndSwapInt32(&r.stop, 1, 0)
+	if r.conn != nil {
+		r.conn.Close()
+	}
 }
 
 func (r *tcpMsgCell) read() {
-	for !r.stop {
+	for !r.IsStop() {
 		err, msg := r.dataReader.ReadData(r.conn)
 		if err != nil {
 			log.LogError("tcp msg cell read data fail :%v", err)
@@ -55,7 +68,7 @@ func onMessage(msg *Message) {
 
 func (r *tcpMsgCell) write() {
 	var msg *Message
-	for !r.stop {
+	for !r.IsStop() {
 		select {
 		case msg = <-r.writeCh:
 		case <-common.StopChan:

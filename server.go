@@ -10,7 +10,7 @@ import (
 
 func Start() {
 	tcpcell := network.NewTcpCell("")
-	tcpcell.StartServe("addr")
+	tcpcell.StartServe("127.0.0.1:9967")
 }
 
 func stop() {
