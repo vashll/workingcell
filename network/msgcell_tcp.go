@@ -12,6 +12,7 @@ type tcpMsgCell struct {
 	writeCh    chan *Message
 	dataReader IDataReader
 	stop       int32
+	worker     *WorkCell
 }
 
 func newTcpMsgCell(conn net.Conn, reader IDataReader) *tcpMsgCell {
@@ -19,6 +20,7 @@ func newTcpMsgCell(conn net.Conn, reader IDataReader) *tcpMsgCell {
 	msgCell.conn = conn
 	msgCell.dataReader = reader
 	msgCell.writeCh = make(chan *Message, 16)
+	msgCell.worker = NewWorker(3, 16)
 	return msgCell
 }
 
@@ -58,12 +60,10 @@ func (r *tcpMsgCell) read() {
 			log.LogError("tcp msg cell read data fail :%v", err)
 			break
 		}
-		onMessage(msg)
+		if r.worker != nil {
+			r.worker.PushMsg(msg)
+		}
 	}
-}
-
-func onMessage(msg *Message) {
-
 }
 
 func (r *tcpMsgCell) write() {
