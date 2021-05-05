@@ -8,9 +8,12 @@ import (
 )
 
 type ServerConfig struct {
-	WorkType       int32 `json:"work_type"`
-	MaxMsgQueueLen int32 `json:"max_msg_queue_len"`
-	PoolSize       int32 `json:"pool_size"`
+	WorkType       int32  `json:"work_type"`
+	MaxMsgQueueLen int32  `json:"max_msg_queue_len"`
+	PoolSize       int32  `json:"pool_size"`
+	AddrIp         string `json:"addr_ip"`
+	TcpPort        string `json:"tcp_port"`
+	RpcPort        string `json:"rpc_port"`
 }
 
 const (
