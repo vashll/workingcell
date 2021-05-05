@@ -18,3 +18,9 @@ func NewDataMsg(data []byte) *Message {
 func ParseProtoMsgData(data []byte) {
 	proto.Unmarshal(data, nil)
 }
+
+type CellMessage struct {
+	Msg     *Message
+	MsgCell *TcpMsgCell
+	User    interface{} //user data bind to message cell.
+}

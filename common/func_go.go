@@ -3,7 +3,7 @@ package common
 import (
 	"os"
 	. "workincell/log"
-	)
+)
 
 var SysStopChan = make(chan os.Signal)
 var StopChan = make(chan struct{})
@@ -16,6 +16,18 @@ func Go(fn func()) {
 			if err := recover(); err != nil {
 				LogStack()
 			}
+		}()
+		fn()
+	}()
+}
+
+func GoWithCallBack(fn func(), cfn func()) {
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				LogStack()
+			}
+			cfn()
 		}()
 		fn()
 	}()

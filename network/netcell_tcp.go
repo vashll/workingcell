@@ -10,7 +10,7 @@ import (
 type tcpNetCell struct {
 	listener   net.Listener
 	dataReader IDataReader
-	stop       bool
+	stop       int32
 }
 
 func (r *tcpNetCell) SetDataReader(reader IDataReader) {
@@ -18,7 +18,7 @@ func (r *tcpNetCell) SetDataReader(reader IDataReader) {
 }
 
 func (r *tcpNetCell) IsStop() bool {
-	return r.stop
+	return r.stop == 1
 }
 
 func (r *tcpNetCell) StartServe(addr string) {
@@ -29,12 +29,12 @@ func (r *tcpNetCell) StartServe(addr string) {
 		return
 	}
 	r.listener = listener
-	r.stop = false
+	r.stop = 0
 	common.Go(func() {
 		select {
 		case <-common.StopChan:
 			if r.listener != nil {
-				r.stop = true
+				r.stop = 1
 				r.listener.Close()
 			}
 		}

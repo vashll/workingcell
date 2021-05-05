@@ -81,15 +81,3 @@ func (r *DefaultDataReader) MsgToData(msg *Message) []byte {
 	}
 	return buf
 }
-
-//func DefaultDataToMsg(data []byte) *Message {
-//	msg := &Message{}
-//	headBuf := data[:DataHeadSize]
-//	head := &DataHead{}
-//	head.Unmarshal(headBuf)
-//	msg.Cmd = head.Cmd
-//	if head.Len > 0 {
-//		msg.Data = data[DataHeadSize:]
-//	}
-//	return msg
-//}

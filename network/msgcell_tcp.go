@@ -7,37 +7,40 @@ import (
 	"workincell/log"
 )
 
-type tcpMsgCell struct {
+type TcpMsgCell struct {
 	conn       net.Conn
 	writeCh    chan *Message
 	dataReader IDataReader
 	stop       int32
 	worker     *WorkCell
+	agentData  interface{}
 }
 
-func newTcpMsgCell(conn net.Conn, reader IDataReader) *tcpMsgCell {
-	msgCell := &tcpMsgCell{}
+func newTcpMsgCell(conn net.Conn, reader IDataReader) *TcpMsgCell {
+	msgCell := &TcpMsgCell{}
 	msgCell.conn = conn
 	msgCell.dataReader = reader
-	msgCell.writeCh = make(chan *Message, 16)
+	msgCell.writeCh = make(chan *Message, 8)
 	msgCell.worker = NewWorker(3, 16)
 	return msgCell
 }
 
-func (r *tcpMsgCell) IsStop() bool {
+func (r *TcpMsgCell) IsStop() bool {
 	return r.stop == 1
 }
 
-func (r *tcpMsgCell) Start() {
+//Set the message cell to run state.
+func (r *TcpMsgCell) SetStart() {
 	r.stop = 1
 }
 
-func (r *tcpMsgCell) Run() {
+//Start a message cell.
+func (r *TcpMsgCell) Run() {
 	if r.dataReader == nil {
 		log.LogError("tcp msg cell run fail, data handler is nil")
 		return
 	}
-	r.Start()
+	r.SetStart()
 	common.Go(func() {
 		r.read()
 	})
@@ -46,14 +49,16 @@ func (r *tcpMsgCell) Run() {
 	})
 }
 
-func (r *tcpMsgCell) Stop() {
+//Stop a message cell, include read and write goroutine.
+func (r *TcpMsgCell) Stop() {
 	atomic.CompareAndSwapInt32(&r.stop, 1, 0)
 	if r.conn != nil {
 		r.conn.Close()
 	}
 }
 
-func (r *tcpMsgCell) read() {
+//Read data form connection by data reader
+func (r *TcpMsgCell) read() {
 	for !r.IsStop() {
 		err, msg := r.dataReader.ReadData(r.conn)
 		if err != nil {
@@ -61,12 +66,17 @@ func (r *tcpMsgCell) read() {
 			break
 		}
 		if r.worker != nil {
-			r.worker.PushMsg(msg)
+			cellMsg := &CellMessage{
+				Msg:  msg,
+				User: r.agentData,
+			}
+			r.worker.PushMsg(cellMsg)
 		}
 	}
 }
 
-func (r *tcpMsgCell) write() {
+// Read message form input channel and write
+func (r *TcpMsgCell) write() {
 	var msg *Message
 	for !r.IsStop() {
 		select {
@@ -82,4 +92,24 @@ func (r *tcpMsgCell) write() {
 			r.conn.Write(r.dataReader.MsgToData(msg))
 		}
 	}
+}
+
+// Send message to client
+func (r *TcpMsgCell) Send(msg *Message) {
+	if msg == nil || r.IsStop() {
+		return
+	}
+	select {
+	case r.writeCh <- msg:
+	default:
+		log.LogError("message cell send crowed, canceled send.")
+	}
+}
+
+func (r *TcpMsgCell) SetAgentData(ad interface{}) {
+	r.agentData = ad
+}
+
+func (r *TcpMsgCell) GetAgentDate() interface{} {
+	return r.agentData
 }
