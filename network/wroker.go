@@ -1,54 +1,200 @@
 package network
 
 import (
-	"sync"
 	"sync/atomic"
 	"workincell/common"
 	"workincell/log"
 )
 
 const (
-	WorkStateRunning = 0
-	WorkStateStopped = 1
+	WorkStateRunning = 1
+	WorkStateStopped = 2
 )
 
-var Worker *WorkCell
-var uniqueLock sync.Locker
+type IWorker interface {
+	IsRunning() bool
+	Stop()
+	StartWork()
+	PushMsg(msg *CellMessage)
+	OnNewMsg(msg *CellMessage)
+}
 
+//唯一worker
+type UniqueWorkCell struct {
+	workTyp        int32 //工作模式
+	msgChan        chan *CellMessage
+	state          int32
+	maxMsgQueueLen int32
+}
+
+func newUniqueWorker(maxLen int32) *UniqueWorkCell {
+	w := &UniqueWorkCell{}
+	if maxLen <= 0 {
+		maxLen = 256
+	}
+	w.state = WorkStateStopped
+	w.maxMsgQueueLen = maxLen
+	w.msgChan = make(chan *CellMessage, maxLen)
+	return w
+}
+
+func (r *UniqueWorkCell) IsRunning() bool {
+	return r.state == WorkStateRunning
+}
+
+func (r *UniqueWorkCell) Stop() {
+	r.state = WorkStateStopped
+}
+
+func (r *UniqueWorkCell) StartWork() {
+	if WorkStateRunning == atomic.LoadInt32(&r.state) {
+		return
+	}
+	r.state = WorkStateRunning
+	common.Go(func() {
+		for r.IsRunning() {
+			select {
+			case msg, ok := <-r.msgChan:
+				if ok {
+					r.OnNewMsg(msg)
+				}
+			case <-common.StopChan:
+				r.Stop()
+				break
+			}
+		}
+	})
+}
+
+func (r *UniqueWorkCell) OnNewMsg(msg *CellMessage) {
+	processMsg(msg.User, msg.MsgCell, msg.Msg)
+}
+
+func (r *UniqueWorkCell) PushMsg(msg *CellMessage) {
+	//maybe drop msg when crowed
+	r.msgChan <- msg
+}
+
+//工作池模式worker
+type PoolWorkCell struct {
+	workTyp        int32 //工作模式
+	msgChan        chan *CellMessage
+	state          int32
+	maxMsgQueueLen int32
+	poolSize       int32
+}
+
+func newPoolWorker(maxLen, poolSize int32) *PoolWorkCell {
+	w := &PoolWorkCell{}
+	if maxLen <= 0 {
+		maxLen = 256
+	}
+	if poolSize <= 0 {
+		poolSize = 8
+	}
+	w.state = WorkStateStopped
+	w.maxMsgQueueLen = maxLen
+	w.poolSize = poolSize
+	w.msgChan = make(chan *CellMessage, maxLen)
+	return w
+}
+
+func (r *PoolWorkCell) IsRunning() bool {
+	return r.state == WorkStateRunning
+}
+
+func (r *PoolWorkCell) Stop() {
+	r.state = WorkStateStopped
+}
+
+func (r *PoolWorkCell) StartWork() {
+	for i := 0; i < int(r.poolSize); i++ {
+		common.Go(func() {
+			for r.IsRunning() {
+				select {
+				case msg, ok := <-r.msgChan:
+					if ok {
+						r.OnNewMsg(msg)
+					}
+				case <-common.StopChan:
+					r.Stop()
+					break
+				}
+			}
+		})
+	}
+}
+
+func (r *PoolWorkCell) OnNewMsg(msg *CellMessage) {
+	processMsg(msg.User, msg.MsgCell, msg.Msg)
+}
+
+func (r *PoolWorkCell) PushMsg(msg *CellMessage) {
+	//maybe drop msg when crowed
+	r.msgChan <- msg
+}
+
+//Reactor
+type ReactorWorkCell struct {
+	workTyp        int32 //工作模式
+	msgChan        chan *CellMessage
+	state          int32
+	maxMsgQueueLen int32
+	poolSize       int32
+}
+
+func newReactorWorker(maxLen int32) *ReactorWorkCell {
+	w := &ReactorWorkCell{}
+	if maxLen <= 0 {
+		maxLen = 8
+	}
+	w.state = WorkStateStopped
+	w.maxMsgQueueLen = maxLen
+	w.msgChan = make(chan *CellMessage, maxLen)
+	return w
+}
+
+func (r *ReactorWorkCell) IsRunning() bool {
+	return r.state == WorkStateRunning
+}
+
+func (r *ReactorWorkCell) Stop() {
+	r.state = WorkStateStopped
+}
+
+func (r *ReactorWorkCell) StartWork() {
+	r.state = WorkStateRunning
+	common.Go(func() {
+		for r.IsRunning() {
+			select {
+			case msg, ok := <-r.msgChan:
+				if ok {
+					r.OnNewMsg(msg)
+				}
+			case <-common.StopChan:
+				r.Stop()
+				break
+			}
+		}
+	})
+}
+
+func (r *ReactorWorkCell) OnNewMsg(msg *CellMessage) {
+	processMsg(msg.User, msg.MsgCell, msg.Msg)
+}
+
+func (r *ReactorWorkCell) PushMsg(msg *CellMessage) {
+	//maybe drop msg when crowed
+	r.msgChan <- msg
+}
+
+//=========================================================================
 type WorkCell struct {
 	workTyp  int32 //工作模式
 	msgChan  chan *CellMessage
 	state    int32 // 0:running, 1:stopped
 	poolChan chan int32
 	poolSize int32
-}
-
-func NewWorker() *WorkCell {
-	cfg := common.ServerCfg
-	if cfg.WorkType == common.WorkTypeUnique {
-		//唯一worker模式
-		if Worker == nil {
-			uniqueLock.Lock()
-			if Worker == nil {
-				Worker = createWorker(cfg.WorkType, cfg.MaxMsgQueueLen)
-			}
-			uniqueLock.Unlock()
-		}
-		return Worker
-	} else if cfg.WorkType == common.WorkTypePool {
-		if Worker == nil {
-			uniqueLock.Lock()
-			if Worker == nil {
-				Worker = createWorker(cfg.WorkType, cfg.MaxMsgQueueLen)
-				Worker.poolSize = cfg.PoolSize
-			}
-			uniqueLock.Unlock()
-		}
-	} else if cfg.WorkType == common.WorkTypeReactor {
-		//连接独享worker
-		return createWorker(cfg.WorkType, cfg.MaxMsgQueueLen)
-	}
-	return nil
 }
 
 func createWorker(typ int32, maxMsgQueueLen int32) *WorkCell {

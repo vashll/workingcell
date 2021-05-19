@@ -9,8 +9,8 @@ import (
 )
 
 func Start() {
-	tcpcell := network.NewTcpCell("")
-	tcpcell.StartServe("127.0.0.1:9967")
+	tcpCell := network.NewTcpCell(1, "", nil)
+	tcpCell.StartServe()
 }
 
 func stop() {

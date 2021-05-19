@@ -22,6 +22,12 @@ const (
 	WorkTypeReactor = 3 //Reactor模式
 )
 
+//连接类型
+const (
+	ConnTypeClient = 1 //客户端连接
+	ConnTypeRpc    = 2 //RPC连接
+)
+
 var configPath string
 var ServerCfg *ServerConfig
 

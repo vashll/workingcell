@@ -16,12 +16,12 @@ type TcpMsgCell struct {
 	agentData  interface{}
 }
 
-func newTcpMsgCell(conn net.Conn, reader IDataReader) *TcpMsgCell {
+func newTcpMsgCell(conn net.Conn, reader IDataReader, wtyp, maxMsgLen, poolSize int32) *TcpMsgCell {
 	msgCell := &TcpMsgCell{}
 	msgCell.conn = conn
 	msgCell.dataReader = reader
 	msgCell.writeCh = make(chan *Message, 8)
-	msgCell.worker = NewWorker(3, 16)
+	//msgCell.worker = newWorker(wtyp, maxMsgLen, poolSize)
 	return msgCell
 }
 
@@ -41,12 +41,8 @@ func (r *TcpMsgCell) Run() {
 		return
 	}
 	r.SetStart()
-	common.Go(func() {
-		r.read()
-	})
-	common.Go(func() {
-		r.write()
-	})
+	r.read()
+	r.write()
 }
 
 //Stop a message cell, include read and write goroutine.
@@ -59,39 +55,39 @@ func (r *TcpMsgCell) Stop() {
 
 //Read data form connection by data reader
 func (r *TcpMsgCell) read() {
-	for !r.IsStop() {
-		err, msg := r.dataReader.ReadData(r.conn)
-		if err != nil {
-			log.LogError("tcp msg cell read data fail :%v", err)
-			break
-		}
-		if r.worker != nil {
-			cellMsg := &CellMessage{
-				Msg:  msg,
-				User: r.agentData,
+	common.Go(func() {
+		for !r.IsStop() {
+			err, msg := r.dataReader.ReadData(r.conn)
+			if err != nil {
+				log.LogError("tcp msg cell read data fail :%v", err)
+				break
 			}
-			r.worker.PushMsg(cellMsg)
+			if r.worker != nil {
+				r.PushMsg(msg)
+			}
 		}
-	}
+	})
 }
 
 // Read message form input channel and write
 func (r *TcpMsgCell) write() {
-	var msg *Message
-	for !r.IsStop() {
-		select {
-		case msg = <-r.writeCh:
-		case <-common.StopChan:
-			r.Stop()
-			break
+	common.Go(func() {
+		var msg *Message
+		for !r.IsStop() {
+			select {
+			case msg = <-r.writeCh:
+			case <-common.StopChan:
+				r.Stop()
+				break
+			}
+			if msg == nil {
+				continue
+			}
+			if r.conn != nil {
+				r.conn.Write(r.dataReader.MsgToData(msg))
+			}
 		}
-		if msg == nil {
-			continue
-		}
-		if r.conn != nil {
-			r.conn.Write(r.dataReader.MsgToData(msg))
-		}
-	}
+	})
 }
 
 // Send message to client
@@ -106,10 +102,22 @@ func (r *TcpMsgCell) Send(msg *Message) {
 	}
 }
 
+//push msg to worker
+func (r *TcpMsgCell) PushMsg(msg *Message) {
+	if r.worker != nil {
+		cellMsg := &CellMessage{
+			Msg:     msg,
+			User:    r.agentData,
+			MsgCell: r,
+		}
+		r.worker.PushMsg(cellMsg)
+	}
+}
+
 func (r *TcpMsgCell) SetAgentData(ad interface{}) {
 	r.agentData = ad
 }
 
-func (r *TcpMsgCell) GetAgentDate() interface{} {
+func (r *TcpMsgCell) GetAgentData() interface{} {
 	return r.agentData
 }
