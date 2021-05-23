@@ -3,7 +3,6 @@ package network
 import (
 	"sync/atomic"
 	"workincell/common"
-	"workincell/log"
 )
 
 const (
@@ -186,70 +185,6 @@ func (r *ReactorWorkCell) OnNewMsg(msg *CellMessage) {
 func (r *ReactorWorkCell) PushMsg(msg *CellMessage) {
 	//maybe drop msg when crowed
 	r.msgChan <- msg
-}
-
-//=========================================================================
-type WorkCell struct {
-	workTyp  int32 //工作模式
-	msgChan  chan *CellMessage
-	state    int32 // 0:running, 1:stopped
-	poolChan chan int32
-	poolSize int32
-}
-
-func createWorker(typ int32, maxMsgQueueLen int32) *WorkCell {
-	wc := &WorkCell{}
-	if maxMsgQueueLen < 1 {
-		log.LogError("worker msg queue len less than 1.")
-		return nil
-	}
-	wc.msgChan = make(chan *CellMessage, maxMsgQueueLen)
-	wc.startWork()
-	return wc
-}
-
-func (r *WorkCell) IsRunning() bool {
-	return r.state == WorkStateRunning
-}
-
-func (r *WorkCell) Stop() {
-	r.state = WorkStateStopped
-}
-
-func (r *WorkCell) startWork() {
-	if 0 == atomic.LoadInt32(&r.state) {
-		return
-	}
-	common.Go(func() {
-		for r.IsRunning() {
-			select {
-			case msg, ok := <-r.msgChan:
-				if ok {
-					r.onNewMsg(msg)
-				}
-			case <-common.StopChan:
-				r.Stop()
-				break
-			}
-		}
-	})
-}
-
-func (r *WorkCell) PushMsg(msg *CellMessage) {
-	r.msgChan <- msg
-}
-
-func (r *WorkCell) onNewMsg(msg *CellMessage) {
-	if r.workTyp == common.WorkTypePool {
-		r.poolChan <- 1
-		common.GoWithCallBack(func() {
-			processMsg(msg.User, msg.MsgCell, msg.Msg)
-		}, func() {
-			<-r.poolChan
-		})
-	} else {
-		processMsg(msg.User, msg.MsgCell, msg.Msg)
-	}
 }
 
 func processMsg(data interface{}, msgCell *TcpMsgCell, msg *Message) {

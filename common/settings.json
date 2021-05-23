@@ -1,8 +1,0 @@
-{
-    "work_type": 3,
-    "max_msg_queue_len": 8,
-    "pool_size": 0,
-    "addr_ip":"127.0.0.1",
-    "tcp_port": "9999",
-    "rpc_port": "9998"
-}

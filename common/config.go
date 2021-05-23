@@ -8,12 +8,9 @@ import (
 )
 
 type ServerConfig struct {
-	WorkType       int32  `json:"work_type"`
-	MaxMsgQueueLen int32  `json:"max_msg_queue_len"`
-	PoolSize       int32  `json:"pool_size"`
-	AddrIp         string `json:"addr_ip"`
-	TcpPort        string `json:"tcp_port"`
-	RpcPort        string `json:"rpc_port"`
+	AddrIp  string `json:"addr_ip"`
+	ExtPort int    `json:"ext_port"`
+	RpcPort int    `json:"rpc_port"`
 }
 
 const (
@@ -24,35 +21,31 @@ const (
 
 //连接类型
 const (
-	ConnTypeClient = 1 //客户端连接
-	ConnTypeRpc    = 2 //RPC连接
+	ConnTypeExt = 1 //外部连接
+	ConnTypeRpc = 2 //RPC连接
 )
 
-var configPath string
-var ServerCfg *ServerConfig
+//var ServerCfg *ServerConfig
 
-func SetServerConfigPath(path string) {
-	configPath = path
-}
+//func GenServerConfig() *ServerConfig {
+//	if configPath == "" {
+//		ServerCfg = &ServerConfig{
+//			AddrIp:  "127.0.0.1",
+//			TcpPort: "7777",
+//			RpcPort: "8888",
+//		}
+//	} else {
+//		readServerConfig()
+//	}
+//	return ServerCfg
+//}
 
-func GenServerConfig() *ServerConfig {
-	if configPath == "" {
-		ServerCfg = &ServerConfig{}
-		//默认模式 Reactor
-		ServerCfg.WorkType = WorkTypeReactor
-		ServerCfg.MaxMsgQueueLen = 8
-	} else {
-		readServerConfig()
-	}
-	return ServerCfg
-}
-
-func readServerConfig() {
-	if configPath == "" {
+func readServerConfig(path string) (serverCfg *ServerConfig) {
+	if path == "" {
 		log.LogError("config path is nil.")
 		return
 	}
-	f, err := os.Open(configPath)
+	f, err := os.Open(path)
 	if err != nil {
 		log.LogError("open config file fail, ", err.Error())
 		return
@@ -65,11 +58,12 @@ func readServerConfig() {
 		log.LogError("read config file fail, ", err.Error())
 		return
 	}
-	ServerCfg = &ServerConfig{}
-	err = json.Unmarshal(data, ServerCfg)
+	serverCfg = &ServerConfig{}
+	err = json.Unmarshal(data, serverCfg)
 	if err != nil {
-		ServerCfg = nil
+		serverCfg = nil
 		log.LogError("config unmaishal fail, ", err.Error())
 		return
 	}
+	return
 }

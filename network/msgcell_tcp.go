@@ -12,16 +12,16 @@ type TcpMsgCell struct {
 	writeCh    chan *Message
 	dataReader IDataReader
 	stop       int32
-	worker     *WorkCell
+	worker     IWorker
 	agentData  interface{}
 }
 
-func newTcpMsgCell(conn net.Conn, reader IDataReader, wtyp, maxMsgLen, poolSize int32) *TcpMsgCell {
+func newTcpMsgCell(conn net.Conn, reader IDataReader, worker IWorker) *TcpMsgCell {
 	msgCell := &TcpMsgCell{}
 	msgCell.conn = conn
 	msgCell.dataReader = reader
 	msgCell.writeCh = make(chan *Message, 8)
-	//msgCell.worker = newWorker(wtyp, maxMsgLen, poolSize)
+	msgCell.worker = worker
 	return msgCell
 }
 
@@ -62,9 +62,7 @@ func (r *TcpMsgCell) read() {
 				log.LogError("tcp msg cell read data fail :%v", err)
 				break
 			}
-			if r.worker != nil {
-				r.PushMsg(msg)
-			}
+			r.PushMsg(msg)
 		}
 	})
 }

@@ -2,6 +2,7 @@ package network
 
 import (
 	"net"
+	"os"
 	"time"
 	"workincell/common"
 	"workincell/log"
@@ -11,7 +12,7 @@ type tcpNetCell struct {
 	listener      net.Listener
 	dataReader    IDataReader
 	stop          int32
-	addr          string
+	listenAddr    string
 	connType      int32 //连接类型(client,rpc)
 	workerBuilder *WorkerBuilder
 }
@@ -25,15 +26,11 @@ func (r *tcpNetCell) IsStop() bool {
 }
 
 func (r *tcpNetCell) StartServe() {
-	var addr string
-	if r.connType == common.ConnTypeClient {
-		addr = common.ServerCfg.AddrIp + ":" + common.ServerCfg.TcpPort
-	} else if r.connType == common.ConnTypeRpc {
-		addr = common.ServerCfg.AddrIp + ":" + common.ServerCfg.RpcPort
-	} else {
+	if r.connType != common.ConnTypeExt && r.connType != common.ConnTypeRpc {
 		log.LogError("connection type is error, type:%v", r.connType)
 		return
 	}
+	addr := r.listenAddr
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.LogError("tcpcell start listen on addr:%s failed:%s", addr, err)
@@ -57,7 +54,7 @@ func (r *tcpNetCell) StartServe() {
 				log.LogError("tcp cell accept fail :%s", err)
 				break
 			} else {
-				msgCell := newTcpMsgCell(conn, r.dataReader, 1, 1, 1)
+				msgCell := newTcpMsgCell(conn, r.dataReader, r.workerBuilder.build())
 				msgCell.Run()
 			}
 		}
@@ -68,17 +65,37 @@ func NewTcpCell(connType int32, addr string, workCfg *WorkConfig) *tcpNetCell {
 	netcell := &tcpNetCell{}
 	netcell.dataReader = &DefaultDataReader{}
 	netcell.connType = connType
-	netcell.addr = addr
-
+	netcell.listenAddr = addr
+	if workCfg == nil {
+		if connType == common.ConnTypeExt {
+			workCfg = getDefaultExtConfig()
+		} else if connType == common.ConnTypeRpc {
+			workCfg = getDefaultRpcConfig()
+		} else {
+			log.LogError("undefined connection type")
+			os.Exit(1)
+			return nil
+		}
+	}
+	netcell.workerBuilder = newWorkerBuilder(workCfg)
 	return netcell
 }
 
-func TcpConnect(addr string, connType int32, reader IDataReader) {
+func TcpConnect(addr string, connType int32, reader IDataReader, workCfg *WorkConfig) {
+	if connType == common.ConnTypeExt {
+		workCfg = getDefaultExtConfig()
+	} else if connType == common.ConnTypeRpc {
+		workCfg = getDefaultRpcConfig()
+	} else {
+		log.LogError("undefined connection type")
+		return
+	}
 	conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 	if err != nil {
 		log.LogError("connect to addr:%s fail err:%s", addr, err.Error())
 		return
 	}
-	msgCell := newTcpMsgCell(conn, reader, 1, 1, 1)
+	wb := newWorkerBuilder(workCfg)
+	msgCell := newTcpMsgCell(conn, reader, wb.build())
 	msgCell.Run()
 }

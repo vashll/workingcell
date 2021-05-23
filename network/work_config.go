@@ -1,6 +1,8 @@
 package network
 
-import "workincell/common"
+import (
+	"workincell/common"
+)
 
 type WorkConfig struct {
 	WorkType       int32
@@ -11,6 +13,12 @@ type WorkConfig struct {
 type WorkerBuilder struct {
 	worker IWorker
 	cfg    *WorkConfig
+}
+
+func newWorkerBuilder(cfg *WorkConfig) *WorkerBuilder {
+	builder := &WorkerBuilder{}
+	builder.cfg = cfg
+	return builder
 }
 
 func (r *WorkerBuilder) build() IWorker {
@@ -26,7 +34,22 @@ func (r *WorkerBuilder) build() IWorker {
 		}
 		return r.worker
 	}
+	// WorkTypeReactor
 	return newReactorWorker(r.cfg.MaxMsgQueueLen)
 }
 
-//func getDefault
+func getDefaultExtConfig() *WorkConfig {
+	return &WorkConfig{
+		WorkType:       common.WorkTypeReactor,
+		MaxMsgQueueLen: 8,
+		PoolSize:       0,
+	}
+}
+
+func getDefaultRpcConfig() *WorkConfig {
+	return &WorkConfig{
+		WorkType:       common.WorkTypePool,
+		MaxMsgQueueLen: 128,
+		PoolSize:       4,
+	}
+}

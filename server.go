@@ -1,6 +1,7 @@
 package workingcell
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -8,9 +9,34 @@ import (
 	"workincell/network"
 )
 
+var ServerCfg *common.ServerConfig
+var ExtWorkCfg *network.WorkConfig
+var RpcWorkCfg *network.WorkConfig
+
+func init() {
+	ServerCfg = &common.ServerConfig{}
+}
+
+func SetServerAddr(ip string, extPort, rpcPort int) {
+	ServerCfg.AddrIp = ip
+	ServerCfg.ExtPort = extPort
+	ServerCfg.RpcPort = rpcPort
+}
+
 func Start() {
-	tcpCell := network.NewTcpCell(1, "", nil)
-	tcpCell.StartServe()
+	if ServerCfg.AddrIp == "" {
+		return
+	}
+	if ServerCfg.ExtPort > 0 {
+		addr := fmt.Sprintf("%s:%v", ServerCfg.AddrIp, ServerCfg.ExtPort)
+		tcpCell := network.NewTcpCell(common.ConnTypeExt, addr, ExtWorkCfg)
+		tcpCell.StartServe()
+	}
+	if ServerCfg.RpcPort > 0 {
+		addr := fmt.Sprintf("%s:%v", ServerCfg.AddrIp, ServerCfg.RpcPort)
+		tcpCell := network.NewTcpCell(common.ConnTypeRpc, addr, RpcWorkCfg)
+		tcpCell.StartServe()
+	}
 }
 
 func stop() {
