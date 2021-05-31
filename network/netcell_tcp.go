@@ -45,6 +45,7 @@ func (r *tcpNetCell) StartServe() {
 				r.stop = 1
 				r.listener.Close()
 			}
+		default:
 		}
 	})
 	common.Go(func() {
@@ -82,13 +83,15 @@ func NewTcpCell(connType int32, addr string, workCfg *WorkConfig) *tcpNetCell {
 }
 
 func TcpConnect(addr string, connType int32, reader IDataReader, workCfg *WorkConfig) {
-	if connType == common.ConnTypeExt {
-		workCfg = getDefaultExtConfig()
-	} else if connType == common.ConnTypeRpc {
-		workCfg = getDefaultRpcConfig()
-	} else {
-		log.LogError("undefined connection type")
-		return
+	if workCfg == nil {
+		if connType == common.ConnTypeExt {
+			workCfg = getDefaultExtConfig()
+		} else if connType == common.ConnTypeRpc {
+			workCfg = getDefaultRpcConfig()
+		} else {
+			log.LogError("undefined connection type")
+			return
+		}
 	}
 	conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 	if err != nil {

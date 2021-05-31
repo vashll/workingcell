@@ -3,6 +3,7 @@ package network
 import (
 	"sync/atomic"
 	"workincell/common"
+	"workincell/log"
 )
 
 const (
@@ -20,7 +21,7 @@ type IWorker interface {
 
 //唯一worker
 type UniqueWorkCell struct {
-	workTyp        int32 //工作模式
+	// workTyp        int32 //工作模式
 	msgChan        chan *CellMessage
 	state          int32
 	maxMsgQueueLen int32
@@ -59,7 +60,6 @@ func (r *UniqueWorkCell) StartWork() {
 				}
 			case <-common.StopChan:
 				r.Stop()
-				break
 			}
 		}
 	})
@@ -70,13 +70,17 @@ func (r *UniqueWorkCell) OnNewMsg(msg *CellMessage) {
 }
 
 func (r *UniqueWorkCell) PushMsg(msg *CellMessage) {
-	//maybe drop msg when crowed
-	r.msgChan <- msg
+	//drop msg when crowed
+	select {
+	case r.msgChan <- msg:
+	default:
+		log.LogInfo("message queue is full, drop message")
+	}
 }
 
 //工作池模式worker
 type PoolWorkCell struct {
-	workTyp        int32 //工作模式
+	// workTyp        int32 //工作模式
 	msgChan        chan *CellMessage
 	state          int32
 	maxMsgQueueLen int32
@@ -107,6 +111,10 @@ func (r *PoolWorkCell) Stop() {
 }
 
 func (r *PoolWorkCell) StartWork() {
+	if WorkStateRunning == atomic.LoadInt32(&r.state) {
+		return
+	}
+	r.state = WorkStateRunning
 	for i := 0; i < int(r.poolSize); i++ {
 		common.Go(func() {
 			for r.IsRunning() {
@@ -117,7 +125,6 @@ func (r *PoolWorkCell) StartWork() {
 					}
 				case <-common.StopChan:
 					r.Stop()
-					break
 				}
 			}
 		})
@@ -129,17 +136,20 @@ func (r *PoolWorkCell) OnNewMsg(msg *CellMessage) {
 }
 
 func (r *PoolWorkCell) PushMsg(msg *CellMessage) {
-	//maybe drop msg when crowed
-	r.msgChan <- msg
+	//drop msg when crowed
+	select {
+	case r.msgChan <- msg:
+	default:
+		log.LogInfo("message queue is full, drop message")
+	}
 }
 
 //Reactor
 type ReactorWorkCell struct {
-	workTyp        int32 //工作模式
+	// workTyp        int32 //工作模式
 	msgChan        chan *CellMessage
 	state          int32
 	maxMsgQueueLen int32
-	poolSize       int32
 }
 
 func newReactorWorker(maxLen int32) *ReactorWorkCell {
@@ -172,7 +182,6 @@ func (r *ReactorWorkCell) StartWork() {
 				}
 			case <-common.StopChan:
 				r.Stop()
-				break
 			}
 		}
 	})
@@ -183,10 +192,13 @@ func (r *ReactorWorkCell) OnNewMsg(msg *CellMessage) {
 }
 
 func (r *ReactorWorkCell) PushMsg(msg *CellMessage) {
-	//maybe drop msg when crowed
-	r.msgChan <- msg
+	//drop msg when crowed
+	select {
+	case r.msgChan <- msg:
+	default:
+		log.LogInfo("message queue is full, drop message")
+	}
 }
 
 func processMsg(data interface{}, msgCell *TcpMsgCell, msg *Message) {
-
 }

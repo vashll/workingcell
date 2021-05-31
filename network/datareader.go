@@ -4,7 +4,7 @@ import (
 	"io"
 	"net"
 	"unsafe"
-	. "workincell/log"
+	"workincell/log"
 )
 
 const (
@@ -12,7 +12,7 @@ const (
 )
 
 type IDataReader interface {
-	ReadData(conn net.Conn) (error, *Message)
+	ReadData(conn net.Conn) (*Message, error)
 	MsgToData(msg *Message) []byte
 }
 
@@ -39,18 +39,15 @@ func (r *DataHead) Unmarshal(data []byte) {
 type DefaultDataReader struct {
 }
 
-func (r *DefaultDataReader) ReadData(conn net.Conn) (err error, msg *Message) {
+func (r *DefaultDataReader) ReadData(conn net.Conn) (msg *Message, err error) {
 	headBuf := make([]byte, DataHeadSize)
 	var head *DataHead
 	size, err := io.ReadFull(conn, headBuf)
 	if err != nil {
-		//if err != io.EOF {
-		//	LogError("connection receive data error:%s", err.Error())
-		//}
 		return
 	}
 	if size != DataHeadSize {
-		LogError("read data head fail data len:%v", size)
+		log.LogError("read data head fail data len:%v", size)
 		return
 	}
 	head = (*DataHead)(unsafe.Pointer(&headBuf[0]))
@@ -59,9 +56,9 @@ func (r *DefaultDataReader) ReadData(conn net.Conn) (err error, msg *Message) {
 	}
 	if head.Len > 0 {
 		dataBuf := make([]byte, head.Len)
-		_, err = io.ReadFull(conn, dataBuf[DataHeadSize:])
+		_, err = io.ReadFull(conn, dataBuf)
 		if err != nil {
-			LogInfo("data handler read data error:%s", err)
+			log.LogInfo("data handler read data error:%s", err)
 			return
 		}
 		msg.Data = dataBuf

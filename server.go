@@ -49,7 +49,12 @@ func WaitExit(fns ...func()) {
 	case <-common.SysStopChan:
 		stop()
 	}
-	for _, f := range fns {
-		f()
+	if len(fns) > 0 {
+		for _, f := range fns {
+			if f == nil {
+				continue
+			}
+			f()
+		}
 	}
 }

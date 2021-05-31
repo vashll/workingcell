@@ -31,7 +31,10 @@ func (r *TcpMsgCell) IsStop() bool {
 
 //Set the message cell to run state.
 func (r *TcpMsgCell) SetStart() {
-	r.stop = 1
+	r.stop = 0
+	if r.worker != nil {
+		r.worker.StartWork()
+	}
 }
 
 //Start a message cell.
@@ -43,6 +46,7 @@ func (r *TcpMsgCell) Run() {
 	r.SetStart()
 	r.read()
 	r.write()
+	log.LogInfo("== go count:%v", common.GetGoCount())
 }
 
 //Stop a message cell, include read and write goroutine.
@@ -57,7 +61,7 @@ func (r *TcpMsgCell) Stop() {
 func (r *TcpMsgCell) read() {
 	common.Go(func() {
 		for !r.IsStop() {
-			err, msg := r.dataReader.ReadData(r.conn)
+			msg, err := r.dataReader.ReadData(r.conn)
 			if err != nil {
 				log.LogError("tcp msg cell read data fail :%v", err)
 				break
@@ -76,7 +80,7 @@ func (r *TcpMsgCell) write() {
 			case msg = <-r.writeCh:
 			case <-common.StopChan:
 				r.Stop()
-				break
+				continue
 			}
 			if msg == nil {
 				continue

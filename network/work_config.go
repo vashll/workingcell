@@ -30,7 +30,7 @@ func (r *WorkerBuilder) build() IWorker {
 	}
 	if r.cfg.WorkType == common.WorkTypePool {
 		if r.worker == nil {
-			r.worker = newPoolWorker(r.cfg.PoolSize, r.cfg.MaxMsgQueueLen)
+			r.worker = newPoolWorker(r.cfg.MaxMsgQueueLen, r.cfg.PoolSize)
 		}
 		return r.worker
 	}
