@@ -24,8 +24,9 @@ func SetServerAddr(ip string, extPort, rpcPort int) {
 }
 
 func Start() {
+	common.FetchNetIp()
 	if ServerCfg.AddrIp == "" {
-		return
+		ServerCfg.AddrIp = common.LocalIp
 	}
 	if ServerCfg.ExtPort > 0 {
 		addr := fmt.Sprintf("%s:%v", ServerCfg.AddrIp, ServerCfg.ExtPort)
