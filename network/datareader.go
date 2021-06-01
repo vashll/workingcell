@@ -67,14 +67,14 @@ func (r *DefaultDataReader) ReadData(conn net.Conn) (msg *Message, err error) {
 }
 
 func (r *DefaultDataReader) MsgToData(msg *Message) []byte {
-	size := len(msg.Data) + DataHeadSize
-	buf := make([]byte, size)
+	dataLen := len(msg.Data)
+	buf := make([]byte, dataLen + DataHeadSize)
 	headBuf := buf[:DataHeadSize]
 	header := (*DataHead)(unsafe.Pointer(&headBuf[0]))
 	header.Cmd = msg.Cmd
-	header.Len = uint32(size)
+	header.Len = uint32(dataLen)
 	if msg.Data != nil {
-		copy(buf[:DataHeadSize], msg.Data)
+		copy(buf[DataHeadSize:], msg.Data)
 	}
 	return buf
 }
