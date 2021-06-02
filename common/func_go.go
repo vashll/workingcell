@@ -2,19 +2,22 @@ package common
 
 import (
 	"os"
-	. "workincell/log"
+	"workincell/log"
+	"sync/atomic"
 )
 
 var SysStopChan = make(chan os.Signal)
 var StopChan = make(chan struct{})
 
+var GoCount int32
+
 func Go(fn func()) {
-	//id := atomic.AddUint32(&goid, 1)
-	//c := atomic.AddInt32(&gocount, 1)
+	atomic.AddInt32(&GoCount, 1)
 	go func() {
 		defer func() {
+			atomic.AddInt32(&GoCount, -1)
 			if err := recover(); err != nil {
-				LogStack()
+				log.LogStack()
 			}
 		}()
 		fn()
@@ -22,13 +25,19 @@ func Go(fn func()) {
 }
 
 func GoWithCallBack(fn func(), cfn func()) {
+	atomic.AddInt32(&GoCount, 1)
 	go func() {
 		defer func() {
+			atomic.AddInt32(&GoCount, -1)
 			if err := recover(); err != nil {
-				LogStack()
+				log.LogStack()
 			}
 			cfn()
 		}()
 		fn()
 	}()
+}
+
+func GetGoCount() int32 {
+	return atomic.LoadInt32(&GoCount)
 }
