@@ -45,7 +45,6 @@ func (r *tcpNetCell) StartServe() {
 				r.stop = 1
 				r.listener.Close()
 			}
-		default:
 		}
 	})
 	common.Go(func() {
