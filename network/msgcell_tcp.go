@@ -55,6 +55,12 @@ func (r *TcpMsgCell) Stop() {
 	if r.conn != nil {
 		r.conn.Close()
 	}
+	if r.writeCh != nil {
+		close(r.writeCh)
+	}
+	if r.worker != nil {
+		r.worker.Stop()
+	}
 }
 
 //Read data form connection by data reader
