@@ -43,6 +43,9 @@ func (r *UniqueWorkCell) IsRunning() bool {
 }
 
 func (r *UniqueWorkCell) Stop() {
+}
+
+func (r *UniqueWorkCell) close() {
 	r.state = WorkStateStopped
 }
 
@@ -55,11 +58,11 @@ func (r *UniqueWorkCell) StartWork() {
 		for r.IsRunning() {
 			select {
 			case msg, ok := <-r.msgChan:
-				if ok {
+				if ok && msg != nil {
 					r.OnNewMsg(msg)
 				}
 			case <-common.StopChan:
-				r.Stop()
+				r.close()
 			}
 		}
 	})
@@ -107,6 +110,9 @@ func (r *PoolWorkCell) IsRunning() bool {
 }
 
 func (r *PoolWorkCell) Stop() {
+}
+
+func (r *PoolWorkCell) close() {
 	r.state = WorkStateStopped
 }
 
@@ -120,11 +126,11 @@ func (r *PoolWorkCell) StartWork() {
 			for r.IsRunning() {
 				select {
 				case msg, ok := <-r.msgChan:
-					if ok {
+					if ok && msg != nil {
 						r.OnNewMsg(msg)
 					}
 				case <-common.StopChan:
-					r.Stop()
+					r.close()
 				}
 			}
 		})
@@ -169,6 +175,12 @@ func (r *ReactorWorkCell) IsRunning() bool {
 
 func (r *ReactorWorkCell) Stop() {
 	r.state = WorkStateStopped
+	if r.msgChan != nil {
+		r.msgChan <- nil
+	}
+}
+
+func (r *ReactorWorkCell) close() {
 }
 
 func (r *ReactorWorkCell) StartWork() {
@@ -177,11 +189,11 @@ func (r *ReactorWorkCell) StartWork() {
 		for r.IsRunning() {
 			select {
 			case msg, ok := <-r.msgChan:
-				if ok {
+				if ok && msg != nil {
 					r.OnNewMsg(msg)
 				}
 			case <-common.StopChan:
-				r.Stop()
+				r.close()
 			}
 		}
 	})
